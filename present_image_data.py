@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # plt.plot([0,2828],[80,428], color = "red")
 
     for i in range(38):
-        plt.plot([-20+i*80,149+i*80],[0,2806],color="blue")
+        plt.plot([-15+i*74,160+i*74],[0,2806],color="blue")
 
     plt.imshow(tif)
     plt.show()
