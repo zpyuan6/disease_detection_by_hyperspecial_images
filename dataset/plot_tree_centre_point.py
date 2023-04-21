@@ -1,11 +1,10 @@
+
 from skimage import io
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
-from PIL import Image
 
-
-def plot_point(tif_img):
+def plot_point(tif_img,date):
     global index
     index = 0
     global tree_centre
@@ -28,6 +27,7 @@ def plot_point(tif_img):
         if event.button==2:
             tree_centre[index].pop()
             print("delete last point", len(tree_centre[index]))
+
     
     for i in range(30):
         plt.plot([0,2828],[-100+i*91,248+i*91], color = "red")
@@ -41,40 +41,45 @@ def plot_point(tif_img):
     plt.show()
 
     a = np.array(tree_centre)
-    np.save("tree_centre.npy",a)
+    np.save(f"tree_centre_{date}.npy",a)
 
-def check_tree_centre(tif_img):
-    tree_centre = np.load("tree_centre.npy",allow_pickle=True)
+def check_tree_centre(tif_img,date):
+    tree_centre = np.load(f"tree_centre_{date}.npy",allow_pickle=True)
     print("Row number: ",tree_centre.shape[0])
 
     for index in range(tree_centre.shape[0]):
 
         arr = tree_centre[index]
 
+        # if index == 8:
+        #     del arr[-14]
+        #     print("Col num: ", len(arr))
+
         tree_centre[index] = arr
-        print("Col num: ", len(arr))
+
         x_list = []
         y_list = []
         for point in arr:
             x_list.append(point[0])
             y_list.append(point[1])
 
-            print(point[0], point[1])
+            if index == 8 :
+                print(point[0], point[1])
             
         plt.plot(x_list,y_list,'o')
 
     plt.imshow(tif_img)
     plt.show()
 
-    # np.save("tree_centre.npy",tree_centre)
+    # np.save(f"tree_centre_{date}.npy",tree_centre)
     
 
-def present_with_rectangle(tif_img):
+def present_with_rectangle(tif_img,date):
 
     fig, ax = plt.subplots()
     ax.imshow(tif_img)
     
-    tree_centre = np.load("tree_centre.npy",allow_pickle=True)
+    tree_centre = np.load(f"tree_centre_{date}.npy",allow_pickle=True)
 
     for index in range(tree_centre.shape[0]):
 
@@ -89,23 +94,15 @@ def present_with_rectangle(tif_img):
     
     plt.show()
 
-def save_to_jpg(tif_img,save_path):
-    im = Image.fromarray(tif_img)
-    im.show()
-    im.save(save_path)
-
 if __name__ == "__main__":
 
     # image_path = "F:\\Hyperspecial\\pear\\14_09_21\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
-    image_path = "F:\\Hyperspecial\\pear\\15_07_22\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
+    DATE = "14_09_21"
+
+    image_path = f"F:\\Hyperspecial\\pear\\{DATE}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
     tif = io.imread(image_path)[:,:,0:3]
     print(tif.shape)
 
-    # plt.imshow(tif)
-    # plt.show()
-
-    # plot_point(tif)
-    # check_tree_centre(tif)
-    # segmentation_image(tif)
-    # present_with_rectangle(tif)
-    save_to_jpg(tif, "F:\\Hyperspecial\\pear\\15_07_22\\Aerial_UAV_Photos\\Orthomosaic.jpg")
+    # plot_point(tif,DATE)
+    check_tree_centre(tif,DATE)
+    # present_with_rectangle(tif,DATE)
