@@ -319,8 +319,45 @@ def present_segmentation(tif,save_path):
     plt.show()
 
 
+def cut_segment_model_input_and_output(save_path,date):
+    input_size = 512
+    step_length = 206
+    target_image_path = "F:\\Hyperspecial\\pear_processed\\segmentation_data\\input"
+    target_label_path = "F:\\Hyperspecial\\pear_processed\\segmentation_data\\label"
+
+    source_image = np.load(os.path.join(save_path,"mosaic_with_NDVI_True.npy"),allow_pickle=True)
+    print("source_image",source_image.shape)
+    source_label = np.load(os.path.join(save_path,"segment_annotation.npy"),allow_pickle=True)
+    print("source_label",source_label.shape)
+
+    num_x = int((source_label.shape[1] - input_size)/step_length)+2
+    num_y = int((source_label.shape[0] - input_size)/step_length)+2
+
+    x_index = 0
+    y_index = 0
+    while y_index <= num_y:
+        while x_index <= num_x:
+            end_x = 512 + (step_length * x_index)
+            end_y = 512 + (step_length * y_index)
+            if x_index == num_x:
+                end_x = source_label.shape[1]
+            if y_index == num_y:
+                end_y = source_label.shape[0]
+
+            input_np = source_image[:, end_y-512:end_y,end_x-512:end_x]
+            label_np = source_label[end_y-512:end_y,end_x-512:end_x]
+
+            np.save(os.path.join(target_image_path,f"{date}_{y_index}_{x_index}.npy"),input_np)
+            np.save(os.path.join(target_label_path,f"{date}_{y_index}_{x_index}.npy"),label_np)
+            x_index += 1
+
+        x_index = 0
+        y_index += 1
+
+
 if __name__ == "__main__":
     date = "15_07_22"
+    # date = "14_09_21"
     # image_path = "F:\\Hyperspecial\\pear\\14_09_21\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
     image_path = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
     save_path = f"F:\\Hyperspecial\\pear\\{date}\\segment"
@@ -343,8 +380,10 @@ if __name__ == "__main__":
     save_path = f"F:\Hyperspecial\pear_processed\{date}"
 
     # segmentation_and_annotation(tif, f"tree_centre_{date}.npy", tree_annotation, save_path)
-    shadow_folder = "F:\Hyperspecial\pear_processed\classifier_training_data\Shadow"
+    # shadow_folder = "F:\Hyperspecial\pear_processed\classifier_training_data\Shadow"
     # generate_segment_annotation(save_path, shadow_folder)
 
-    present_segmentation(tif, save_path)
+    # present_segmentation(tif, save_path)
+
+    cut_segment_model_input_and_output(save_path,date)
 
