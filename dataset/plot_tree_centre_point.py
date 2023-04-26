@@ -3,13 +3,30 @@ from skimage import io
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+import os
 
 def plot_point(tif_img,date):
     global index
     index = 0
     global tree_centre
     tree_centre = [[]]
+    if os.path.exists(f"tree_centre_{date}.npy"):
+        tree_centre = np.load(f"tree_centre_{date}.npy", allow_pickle=True)
+
     fig = plt.figure()
+
+    if os.path.exists(f"tree_centre_{date}.npy"):
+        for i in range(tree_centre.shape[0]):
+
+            arr = tree_centre[i]
+
+            x_list = []
+            y_list = []
+            for point in arr:
+                x_list.append(point[0])
+                y_list.append(point[1])
+                
+            plt.plot(x_list,y_list,'o')
 
     def on_press(event):
         global index
@@ -44,29 +61,54 @@ def plot_point(tif_img,date):
     np.save(f"tree_centre_{date}.npy",a)
 
 def check_tree_centre(tif_img,date):
+    annotation_yellow = [[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]]
+    annotation_blue = [[3,16],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[15,14],[23,28]]
+
     tree_centre = np.load(f"tree_centre_{date}.npy",allow_pickle=True)
     print("Row number: ",tree_centre.shape[0])
+
+    # tree_centre = np.delete(tree_centre, [21])
+
+    yellow_list_x = []
+    yellow_list_y = []
+    blue_list_x = []
+    blue_list_y = []
 
     for index in range(tree_centre.shape[0]):
 
         arr = tree_centre[index]
 
-        # if index == 8:
-        #     del arr[-14]
-        #     print("Col num: ", len(arr))
+        print(type(arr))
 
+        # if index == 20:
+        #     del arr[-14]
+        #     arr.extend(tree_centre[21])
+
+
+        print("Col num: ", len(arr), index)
         tree_centre[index] = arr
 
         x_list = []
         y_list = []
-        for point in arr:
-            x_list.append(point[0])
-            y_list.append(point[1])
+        for j, point in enumerate(arr):
 
-            if index == 8 :
-                print(point[0], point[1])
+            if [index,j] in annotation_yellow:
+                yellow_list_x.append(point[0])
+                yellow_list_y.append(point[1])
+            elif [index,j] in annotation_blue:
+                blue_list_x.append(point[0])
+                blue_list_y.append(point[1])
+            else:
+                x_list.append(point[0])
+                y_list.append(point[1])
+
+            # if index == 20:
+            #     print(point[0], point[1])
             
-        plt.plot(x_list,y_list,'o')
+        plt.plot(x_list,y_list,'o', color = 'Green')
+    
+    plt.plot(yellow_list_x,yellow_list_y, 'o', color = 'yellow')
+    plt.plot(blue_list_x,blue_list_y, 'o', color = 'blue')
 
     plt.imshow(tif_img)
     plt.show()
@@ -74,36 +116,13 @@ def check_tree_centre(tif_img,date):
     # np.save(f"tree_centre_{date}.npy",tree_centre)
 
 def present_with_rectangle(tif_img,date):
+    annotation_yellow = [[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]]
+    annotation_blue = [[3,16],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[15,14],[23,28]]
 
     fig, ax = plt.subplots()
     ax.imshow(tif_img)
     
     tree_centre = np.load(f"tree_centre_{date}.npy",allow_pickle=True)
-
-    for index in range(tree_centre.shape[0]):
-
-        arr = tree_centre[index]
-
-        for i in range(len(arr)):
-            xc,yc = arr[i][0],arr[i][1]
-            rect = mpatches.Rectangle((xc-25,yc-25),50,50,fill=False,edgecolor = 'red', linewidth=2)
-
-            ax.add_patch(rect)
-
-    
-    plt.show()
-
-def present_plot_in_segment_map(date):
-    annotation_yellow = [[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]]
-    annotation_blue = [[3,16],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[15,14],[23,28]]
-
-    tree_centre = np.load(f"tree_centre_{date}.npy",allow_pickle=True)
-
-    mosaic = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
-    segment_mask = io.imread(f"F:\\Hyperspecial\\pear\\{date}\\segment_map.jpg")
-
-    fig, ax = plt.subplots()
-    ax.imshow(segment_mask)
 
     for index in range(tree_centre.shape[0]):
 
@@ -119,7 +138,45 @@ def present_plot_in_segment_map(date):
             if [index,i] in annotation_blue:
                 color = 'blue'
 
-            rect = mpatches.Rectangle((xc-25,yc-25),50,50,fill=False, edgecolor = color, linewidth=1)
+            rect = mpatches.Rectangle((xc-25,yc-25),50,50,fill=False,edgecolor = color, linewidth=2)
+
+            ax.add_patch(rect)
+
+    
+    plt.show()
+
+def present_plot_in_segment_map(date):
+    annotation_yellow = [[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]]
+    annotation_blue = [[3,16],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[15,14],[23,28]]
+
+    tree_centre = np.load(f"tree_centre_{date}.npy",allow_pickle=True)
+
+    mosaic = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
+    # segment_mask = io.imread(f"F:\\Hyperspecial\\pear\\{date}\\segment_map.jpg")
+    segment_mask = io.imread(f"show_cluster_result.jpg")
+    mosaic_img = io.imread(mosaic)
+
+    fig, ax = plt.subplots()
+    ax.imshow(mosaic_img)
+
+    # ax.imshow(segment_mask, alpha=0.4)
+    
+
+    for index in range(tree_centre.shape[0]):
+
+        arr = tree_centre[index]
+
+        for i in range(len(arr)):
+            xc,yc = arr[i][0],arr[i][1]
+
+            color = 'green'
+            if [index,i] in annotation_yellow:
+                color = 'yellow'
+
+            if [index,i] in annotation_blue:
+                color = 'blue'
+
+            rect = mpatches.Rectangle((xc-25,yc-25),50,50, fill=False, edgecolor = color, linewidth=4)
 
             ax.add_patch(rect)
     
@@ -140,7 +197,7 @@ if __name__ == "__main__":
     print(tif.shape)
 
     # plot_point(tif,DATE)
-    # check_tree_centre(tif,DATE)
+    check_tree_centre(tif,DATE)
     # present_with_rectangle(tif,DATE)
 
-    present_plot_in_segment_map(DATE)
+    # present_plot_in_segment_map(DATE)

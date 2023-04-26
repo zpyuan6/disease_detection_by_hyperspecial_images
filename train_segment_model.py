@@ -4,6 +4,7 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 import random
 import tqdm
+import numpy as np
 from dataset.SegmentationDataset import SegmentationDataset
 
 def load_data(data_path,batch_size):
@@ -32,7 +33,10 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
     with tqdm.tqdm(total= step_num) as tbar:
         for data, target in train_datasetloader:
             data, target = data.to(device), target.to(device)
+            if data.shape[0] == 1:
+                continue
             output = model(data)["out"]
+            print(output.shape, target.shape)
             loss = loss_function(output, target)
             optimizer.zero_grad()
             loss.backward()
@@ -56,11 +60,11 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader):
         with tqdm.tqdm(total = len(val_datasetloader)) as pbar:
             for data, target in val_datasetloader:
                 data, target = data.to(device), target.to(device)
-                output = model(data)
+                output = model(data)["out"]
                 loss = loss_function(output, target)
-                pred = torch.argmax(output["out"].cpu(), 1)
+                pred = torch.argmax(output, 1)
                 correct += torch.sum(pred == target)
-                total_num += torch.prod(pred.shape)
+                total_num += pred.shape.numel()
                 print_loss = loss.data.item()
                 test_loss += print_loss
                 pbar.update(1)
@@ -69,9 +73,20 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader):
         acc = correct / total_num
         avgloss = test_loss / len(val_datasetloader)
         print('\nVal set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-            avgloss, correct, len(val_datasetloader.dataset), 100 * acc))
+            avgloss, correct, total_num, 100 * acc))
     
     return avgloss, correct, acc
+
+def load_parameters(model:torch.nn.Module, parameter_path:str) -> torch.nn.Module:
+    model_dict = model.state_dict()
+
+    pretrained_dict = torch.load(parameter_path)
+    pretrained_dict = {k: v for k, v in model_dict.items() if np.shape(pretrained_dict[k]) == np.shape(v)}
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
+    print(f"Load parameter {len(model_dict)}/{len(pretrained_dict)}")
+
+    return model
 
 if __name__ == "__main__":
     data_path = "F:\Hyperspecial\pear_processed\segmentation_data"
@@ -79,8 +94,17 @@ if __name__ == "__main__":
     epoch_num = 50
     batch_size = 8
     learn_rate = 0.0001
+    pretrained_model_path = "log\\segment_best_pretrained.pth"
 
-    model = torchvision.models.segmentation.deeplabv3_resnet50(num_classes=5)
+    model = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True)
+    print(model)
+    model.backbone.conv1 = torch.nn.Conv2d(5,64,kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+    model.aux_classifier[4] = torch.nn.Conv2d(256, 5, kernel_size=(1, 1), stride=(1, 1))
+    model.classifier[4] = torch.nn.Conv2d(256, 5, kernel_size=(1, 1), stride=(1, 1))
+
+    if pretrained_model_path != None:
+        model = load_parameters(model, pretrained_model_path)
+
     model.to(device)
 
     train_dataloader, val_dataloader = load_data(data_path, batch_size)
@@ -98,6 +122,8 @@ if __name__ == "__main__":
     print("val dataset total images: {}, step number: {}".format(total_num, step_num))
 
     for i in range(epoch_num):
+        best_acc = 0
+
         train_avgloss = train_model(model, loss_function, optimizer, device, epoch_num, i, train_dataloader)
         val_avgloss, correct, acc = val_model(model, device, loss_function, val_dataloader)
 
@@ -105,5 +131,9 @@ if __name__ == "__main__":
         writer.add_scalar(tag="val_avgloss", scalar_value=val_avgloss, global_step=i)
         writer.add_scalar(tag="val_acc", scalar_value=acc, global_step=i)
         
+        if acc>best_acc:
+            torch.save(model.state_dict(), 'log/segment_best.pth')
+            best_acc = acc
+
         if (i+1) % 5 == 0:
-            torch.save(model.state_dict(), 'log/alex_{}.pth'.format(str(i)))
+            torch.save(model.state_dict(), 'log/segment_{}.pth'.format(str(i)))

@@ -154,10 +154,9 @@ def cluster_segments(segment_folder:str):
 
 
 def present_cluster(save_path, file_id_list, cluster_result):
-    COLOR_MAP = [[0,0,0],[128,0,0],[0,128,0],[0,0,128],[128,128,0],[128,0,128]]
-    GRAY_MAP = [0.0,51.0,102.0,153.0,204.0,255.0]
-
-    print(len(file_id_list), len(cluster_result))
+    COLOR_MAP = [[131,60,11],[112,173,71],[0,112,192],[255,192,0],[0,0,0]]
+    # GRAY_MAP = [0.0,51.0,102.0,153.0,204.0,255.0]
+    GRAY_MAP = [0.0,1.0,2.0,3.0,4.0,5.0]
 
     max_index = np.max(cluster_result)+1
     print(max_index)
@@ -168,7 +167,8 @@ def present_cluster(save_path, file_id_list, cluster_result):
             patch_mask = transforms.ToTensor()(Image.open(os.path.join(save_path, f"{file_id}_patch.jpg")).convert('L')).squeeze()
 
             if mosaic_images == None:
-                mosaic_images = (patch_mask != 0) * GRAY_MAP[cluster_result[i]+1]
+                # mosaic_images = Image.new("RGB",(patch_mask.shape[1],patch_mask.shape[0]))
+                mosaic_images = (patch_mask != 0) * GRAY_MAP[cluster_result[i]]
             else:
                 mosaic_images = mosaic_images + ((patch_mask != 0) * GRAY_MAP[cluster_result[i]+1])
             
@@ -176,10 +176,28 @@ def present_cluster(save_path, file_id_list, cluster_result):
 
     print(mosaic_images, mosaic_images.shape)
 
-    mask_images = transforms.ToPILImage()(mosaic_images)
-
-    plt.imshow(mask_images)
+    # mask_images = transforms.ToPILImage()(mosaic_images)
+    plt.imshow(mosaic_images)
     plt.show()
+
+    mosaic_plt_image = Image.new("RGB", (mosaic_images.shape[1],mosaic_images.shape[0]))
+
+    with tqdm.tqdm(total=mosaic_images.shape[1]) as tbar:
+        for i in range(0, mosaic_images.shape[1]):
+            for j in range(0, mosaic_images.shape[0]):
+                color = COLOR_MAP[1]
+                if mosaic_images[j][i] == 3 or mosaic_images[j][i] == 4:
+                    color = COLOR_MAP[0]
+                mosaic_plt_image.putpixel([i,j],(color[0],color[1],color[2]))
+            tbar.update(1)
+
+    mosaic_plt_image = mosaic_plt_image.crop((1000, 2000, 1512, 2512))
+
+    plt.imshow(mosaic_plt_image)
+    plt.savefig("show_cluster_result.jpg")
+    plt.show()
+
+    return mosaic_plt_image
 
 
 def segmentation_and_annotation(tif_img, tree_centres_path, tree_annotation:dict, save_path=None):
@@ -281,7 +299,7 @@ def generate_segment_annotation(save_path, shadow_folder=None):
 
     for segment_id in anarsiaLineatella_tree_list:
         segmentation_annotation[segment_map==segment_id] = 0
-    print("Finish anarsiaLineatella_tree_list",type(anarsiaLineatella_tree_list),type(anarsiaLineatella_tree_list[0]))
+    print("Finish anarsiaLineatella_tree_list",type(anarsiaLineatella_tree_list))
     for segment_id in dead_tree_list:
         segmentation_annotation[segment_map==segment_id] = 2
     print("Finish dead_tree_list",type(dead_tree_list))
@@ -307,15 +325,34 @@ def generate_segment_annotation(save_path, shadow_folder=None):
 def present_segmentation(tif,save_path):
     annotation = np.load(os.path.join(save_path, "segment_annotation.npy"),allow_pickle=True) 
     
+    # plt.subplot(1,3,1)
+    # plt.imshow(tif)
+    # plt.subplot(1,3,2)
+    # plt.imshow(annotation)
+    # plt.subplot(1,3,3)
+    # plt.imshow(tif)
+    # plt.imshow(annotation,alpha=0.2)
 
-    plt.subplot(1,3,1)
-    plt.imshow(tif)
-    plt.subplot(1,3,2)
-    plt.imshow(annotation)
-    plt.subplot(1,3,3)
-    plt.imshow(tif)
-    plt.imshow(annotation,alpha=0.2)
+    COLOR_MAP = [[131,60,11],[112,173,71],[0,112,192],[255,192,0],[0,0,0]]
 
+    # plt.imshow(annotation)
+    mosaic_plt_image = Image.new("RGB", (annotation.shape[1],annotation.shape[0]))
+    with tqdm.tqdm(total=annotation.shape[1]) as tbar:
+        for i in range(0, annotation.shape[1]):
+            for j in range(0, annotation.shape[0]):
+                color = COLOR_MAP[0]
+
+                if annotation[j][i] == 3:
+                    color = COLOR_MAP[2]
+                elif annotation[j][i] == 4:
+                    color = COLOR_MAP[1]
+                elif annotation[j][i] == 0:
+                    color = COLOR_MAP[3]
+
+                mosaic_plt_image.putpixel([i,j],(color[0],color[1],color[2]))
+            tbar.update(1)
+
+    plt.imshow(mosaic_plt_image)
     plt.show()
 
 
@@ -330,8 +367,8 @@ def cut_segment_model_input_and_output(save_path,date):
     source_label = np.load(os.path.join(save_path,"segment_annotation.npy"),allow_pickle=True)
     print("source_label",source_label.shape)
 
-    num_x = int((source_label.shape[1] - input_size)/step_length)+2
-    num_y = int((source_label.shape[0] - input_size)/step_length)+2
+    num_x = int((source_label.shape[1] - input_size)/step_length)+1
+    num_y = int((source_label.shape[0] - input_size)/step_length)+1
 
     x_index = 0
     y_index = 0
@@ -345,6 +382,7 @@ def cut_segment_model_input_and_output(save_path,date):
                 end_y = source_label.shape[0]
 
             input_np = source_image[:, end_y-512:end_y,end_x-512:end_x]
+            input_np[input_np == -1e4] = 0
             label_np = source_label[end_y-512:end_y,end_x-512:end_x]
 
             np.save(os.path.join(target_image_path,f"{date}_{y_index}_{x_index}.npy"),input_np)
@@ -355,9 +393,26 @@ def cut_segment_model_input_and_output(save_path,date):
         y_index += 1
 
 
+def generate_img_for_paper(tif_img):
+    image_start_x = 1000
+    image_start_y = 2000
+    image_size = 512
+    plt.axis("off")
+    plt.imshow(tif_img[image_start_y:image_start_y+image_size,image_start_x:image_start_x+image_size,:])
+    plt.savefig("show_source_image.jpg")
+    
+    # mask = segmentation_image(tif_img)
+    # unsupervised_segment_img = mark_boundaries(tif_img,mask)
+    # plt.imshow(unsupervised_segment_img[image_start_y:image_start_y+image_size,image_start_x:image_start_x+image_size,:])
+    # plt.savefig("show_unsupervised_segment_image.jpg")
+    
+
+
 if __name__ == "__main__":
+    # date = "15_07_22"
+    # date = "14_09_2
+    # 1"
     date = "15_07_22"
-    # date = "14_09_21"
     # image_path = "F:\\Hyperspecial\\pear\\14_09_21\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
     image_path = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
     save_path = f"F:\\Hyperspecial\\pear\\{date}\\segment"
@@ -366,24 +421,36 @@ if __name__ == "__main__":
 
     # plt.imshow(tif)
     # plt.show()
+    # generate_img_for_paper(tif)
 
     # segmentation_and_save(tif,save_path)
-        # file_id_list, cluster_result = cluster_segments(save_path)
-        # present_cluster(save_path, file_id_list, cluster_result)
+    file_id_list, cluster_result = cluster_segments(save_path)
+    present_cluster(save_path, file_id_list, cluster_result)
 
+    # tree_annotation = {
+    #     "anarsiaLineatella":[[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]],
+    #     "grapholitaMolesta":[[3,16],[4,11],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[14,28],[14,24],[15,13],[16,14],[23,28]],
+    #     "dead":[[2,5],[5,2],[12,16],[13,34],[18,34],[19.34],[22,0]]
+    #     }
     tree_annotation = {
         "anarsiaLineatella":[[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]],
-        "grapholitaMolesta":[[3,16],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[15,14],[23,28]],
+        "grapholitaMolesta":[[3,15],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[16,14],[23,28]],
         "dead":[]
         }
+    # tree_annotation = {
+    #     "anarsiaLineatella":[],
+    #     "grapholitaMolesta":[],
+    #     "dead":[]
+    #     }
 
     save_path = f"F:\Hyperspecial\pear_processed\{date}"
 
     # segmentation_and_annotation(tif, f"tree_centre_{date}.npy", tree_annotation, save_path)
     # shadow_folder = "F:\Hyperspecial\pear_processed\classifier_training_data\Shadow"
     # generate_segment_annotation(save_path, shadow_folder)
+    # generate_segment_annotation(save_path)
 
     # present_segmentation(tif, save_path)
 
-    cut_segment_model_input_and_output(save_path,date)
+    # cut_segment_model_input_and_output(save_path,date)
 
