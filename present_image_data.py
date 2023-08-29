@@ -97,7 +97,9 @@ def save_to_jpg(tif_img,save_path):
 if __name__ == "__main__":
 
     # image_path = "F:\\Hyperspecial\\pear\\14_09_21\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
-    image_path = "F:\\Hyperspecial\\pear\\15_07_22\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
+    # image_path = "F:\\Hyperspecial\\pear\\15_07_22\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
+    # "F:\Hyperspecial\pear\27_07_21\Aerial_UAV_Photos"
+    image_path = "F:\\Hyperspecial\\cherry\\13-07-2022\\Aerial_UAV_photos\\rededge.rgb.tif"
     tif = io.imread(image_path)[:,:,0:3]
     print(tif.shape)
 
@@ -108,4 +110,4 @@ if __name__ == "__main__":
     # check_tree_centre(tif)
     # segmentation_image(tif)
     # present_with_rectangle(tif)
-    save_to_jpg(tif, "F:\\Hyperspecial\\pear\\15_07_22\\Aerial_UAV_Photos\\Orthomosaic.jpg")
+    save_to_jpg(tif, "F:\\Hyperspecial\\cherry\\13-07-2022\\Aerial_UAV_photos\\rededge.jpg")

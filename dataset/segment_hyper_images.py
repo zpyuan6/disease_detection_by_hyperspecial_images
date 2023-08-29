@@ -12,8 +12,12 @@ import time
 from sklearn.cluster import KMeans
 import joblib
 import yaml
+import random
+import shutil
 
 import tqdm
+from libtiff import TIFF
+from skimage.io  import imread, imsave
 
 def segmentation_image(tif_img) -> np.ndarray:
     # segments_fz = felzenszwalb(tif_img, scale=200, sigma=0.8, min_size=50)
@@ -323,7 +327,9 @@ def generate_segment_annotation(save_path, shadow_folder=None):
     np.save(os.path.join(save_path, "segment_annotation.npy"),segmentation_annotation.numpy())
 
 def present_segmentation(tif,save_path):
-    annotation = np.load(os.path.join(save_path, "segment_annotation.npy"),allow_pickle=True) 
+    # annotation = np.load(os.path.join(save_path, "segment_annotation.npy"),allow_pickle=True) 
+
+    annotation = np.load("F:\\Hyperspecial\\pear_processed\\segmentation_data\\label\\14_09_22_4_4.npy",allow_pickle=True) 
     
     # plt.subplot(1,3,1)
     # plt.imshow(tif)
@@ -358,9 +364,14 @@ def present_segmentation(tif,save_path):
 
 def cut_segment_model_input_and_output(save_path,date):
     input_size = 512
-    step_length = 206
-    target_image_path = "F:\\Hyperspecial\\pear_processed\\segmentation_data\\input"
-    target_label_path = "F:\\Hyperspecial\\pear_processed\\segmentation_data\\label"
+    step_length = 512
+    target_image_path = "F:\\Hyperspecial\\pear_processed\\segmentation_data_unoverlap\\input"
+    target_label_path = "F:\\Hyperspecial\\pear_processed\\segmentation_data_unoverlap\\label"
+
+    if not os.path.exists(target_image_path):
+        os.makedirs(target_image_path)
+        os.makedirs(target_label_path)
+
 
     source_image = np.load(os.path.join(save_path,"mosaic_with_NDVI_True.npy"),allow_pickle=True)
     print("source_image",source_image.shape)
@@ -393,6 +404,79 @@ def cut_segment_model_input_and_output(save_path,date):
         y_index += 1
 
 
+def cut_image_for_object_detection_model(save_path,date):
+    input_size = 512
+    step_length = 206
+
+    target_image_path = "F:\\Hyperspecial\\pear_processed\\yolo_object_detection\\images"
+    target_label_path = "F:\\Hyperspecial\\pear_processed\\yolo_object_detection\\labels"
+
+    if not os.path.exists(target_image_path):
+        os.makedirs(target_image_path)
+        os.makedirs(target_label_path)
+
+    # source_image = np.load(os.path.join(save_path,"mosaic_with_NDVI_False.npy"),allow_pickle=True)
+    source_image = io.imread(os.path.join(save_path,"Orthomosaic.rgb.tif"))
+    print(source_image.shape)
+
+    # source_label = open(os.path.join(save_path,"annotation.txt")).read().split("\n")
+    
+    num_x = int((source_image.shape[1] - input_size)/step_length)+1
+    num_y = int((source_image.shape[0] - input_size)/step_length)+1
+
+    print("num_x,num_y",num_x,num_y)
+
+    x_index = 0
+    y_index = 0
+    while y_index <= num_y:
+        while x_index <= num_x:
+            end_x = 512 + (step_length * x_index)
+            end_y = 512 + (step_length * y_index)
+            if x_index == num_x:
+                end_x = source_image.shape[1]
+            if y_index == num_y:
+                end_y = source_image.shape[0]
+
+            input_np = source_image[end_y-512:end_y,end_x-512:end_x,:]
+            input_np[input_np == -1e4] = 0
+
+            # plt.imshow(input_np)
+            # plt.show()
+
+            # np.save(os.path.join(target_image_path,f"{date}_{y_index}_{x_index}.npy"),input_np)
+            io.imsave(os.path.join(target_image_path,f"{date}_{y_index}_{x_index}.png"),input_np)
+
+            # start_x = end_x - input_size
+            # start_y = end_y - input_size
+
+            # with open(os.path.join(target_label_path, f"{date}_{y_index}_{x_index}.txt"),'w') as annotation_file:
+            #     for source_label_line in source_label:
+            #         if len(source_label_line)>1:
+            #             label_arr = [float(i) for i in source_label_line.split()] 
+            #             xc,yc,w,h = label_arr[1],label_arr[2],label_arr[3],label_arr[4]
+
+            #             x_min = (xc-(w/2)) * source_image.shape[2]
+            #             y_min = (yc-(h/2)) * source_image.shape[1]
+            #             x_max = (xc+(w/2)) * source_image.shape[2]
+            #             y_max = (yc+(h/2)) * source_image.shape[1]
+
+            #             print(x_max > start_x and x_min < end_x and y_max > start_y and y_min < end_y, x_max,start_x,x_min, end_x, y_max, start_y, y_min, end_y)
+
+            #             if x_max > start_x and x_min < end_x and y_max > start_y and y_min < end_y:
+            #                 print(x_max,start_x,x_min, end_x, y_max, start_y, y_min, end_y)
+            #                 x_start = (max(start_x, x_min) - start_x)/input_size
+            #                 x_end = (min(end_x, x_max) - start_x)/input_size
+            #                 y_start = (max(start_y, y_min) - start_y)/input_size
+            #                 y_end = (min(end_y, y_max) - start_y)/input_size
+
+            #                 annotation_file.write(f"{int(label_arr[0])} {(x_start+x_end)/2} {(y_start+y_end)/2} {(x_end-x_start)} {(y_end-y_start)}\n")
+
+            x_index += 1
+
+        x_index = 0
+        y_index += 1
+    
+
 def generate_img_for_paper(tif_img):
     image_start_x = 1000
     image_start_y = 2000
@@ -407,43 +491,82 @@ def generate_img_for_paper(tif_img):
     # plt.savefig("show_unsupervised_segment_image.jpg")
     
 
+def split_train_val_for_object_detection():
+    img_path = "F:\Hyperspecial\pear_processed\yolo_object_detection\images"
+    label_path = "F:\Hyperspecial\pear_processed\yolo_object_detection\labels"
+
+    img_id_list = []
+    for root, folders, files in os.walk(img_path):
+        img_id_list.extend(files)
+        break
+    
+    print(len(img_id_list))
+
+    random.shuffle(img_id_list)
+
+    for i in range(len(img_id_list)):
+
+        if i < len(img_id_list)*0.9:  
+            shutil.move(os.path.join(img_path, img_id_list[i]),os.path.join(img_path,"train", img_id_list[i]))
+            annotation_file = img_id_list[i].split(".")[0]+".txt"
+            shutil.move(os.path.join(label_path, annotation_file),os.path.join(label_path,"train", annotation_file))
+        else:
+            shutil.move(os.path.join(img_path, img_id_list[i]),os.path.join(img_path,"val", img_id_list[i]))
+            annotation_file = img_id_list[i].split(".")[0]+".txt"
+            shutil.move(os.path.join(label_path, annotation_file),os.path.join(label_path,"val", annotation_file))
+        
+
+def convert_np_to_tif():
+    path = "F:\Hyperspecial\pear_processed\yolo_object_detection_times_255\images"
+
+    for root, folders, files in os.walk(path):
+        for file in files:
+            n = np.load(os.path.join(root, file)) * 255.0
+            print(n.shape)
+            # n = n.transpose(1,2,0)
+            # img = transforms.ToPILImage()(n)
+            # img.save(os.path.join(root, file.split(".")[0]+".tiff"))
+            # tif = TIFF.open(os.path.join(root, file.split(".")[0]+".tif"), mode='w')
+            # tif.write_image(n)
+            # imsave(os.path.join(root, file.split(".")[0]+".tif"), n)
+            np.save(os.path.join(root, file), n)
+
 
 if __name__ == "__main__":
     # date = "15_07_22"
-    # date = "14_09_2
-    # 1"
-    date = "15_07_22"
+    # date = "14_09_21"
+    # date = "27_07_21"
     # image_path = "F:\\Hyperspecial\\pear\\14_09_21\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
-    image_path = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
-    save_path = f"F:\\Hyperspecial\\pear\\{date}\\segment"
-    tif = io.imread(image_path)[:,:,0:3]
-    print(tif.shape)
+    # image_path = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos\\Orthomosaic.rgb.tif"
+    # save_path = f"F:\\Hyperspecial\\pear\\{date}\\segment"
+    # tif = io.imread(image_path)[:,:,0:3]
+    # print(tif.shape)
 
     # plt.imshow(tif)
     # plt.show()
     # generate_img_for_paper(tif)
 
     # segmentation_and_save(tif,save_path)
-    file_id_list, cluster_result = cluster_segments(save_path)
-    present_cluster(save_path, file_id_list, cluster_result)
+    # file_id_list, cluster_result = cluster_segments(save_path)
+    # present_cluster(save_path, file_id_list, cluster_result)
 
     # tree_annotation = {
     #     "anarsiaLineatella":[[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]],
     #     "grapholitaMolesta":[[3,16],[4,11],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[14,28],[14,24],[15,13],[16,14],[23,28]],
     #     "dead":[[2,5],[5,2],[12,16],[13,34],[18,34],[19.34],[22,0]]
     #     }
-    tree_annotation = {
-        "anarsiaLineatella":[[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]],
-        "grapholitaMolesta":[[3,15],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[16,14],[23,28]],
-        "dead":[]
-        }
+    # tree_annotation = {
+    #     "anarsiaLineatella":[[0,18],[0,24],[1,10],[1,18],[1,28],[2,17],[2,19],[3,3],[3,9],[3,19],[4,22],[5,24],[6,13],[6,16],[6,24],[8,28],[10,6],[18,23]],
+    #     "grapholitaMolesta":[[3,15],[4,13],[4,19],[5,1],[5,3],[5,14],[5,22],[6,6],[7,0],[14,1],[14,16],[15,13],[16,14],[23,28]],
+    #     "dead":[]
+    #     }
     # tree_annotation = {
     #     "anarsiaLineatella":[],
     #     "grapholitaMolesta":[],
     #     "dead":[]
     #     }
 
-    save_path = f"F:\Hyperspecial\pear_processed\{date}"
+    # save_path = f"F:\Hyperspecial\pear_processed\{date}"
 
     # segmentation_and_annotation(tif, f"tree_centre_{date}.npy", tree_annotation, save_path)
     # shadow_folder = "F:\Hyperspecial\pear_processed\classifier_training_data\Shadow"
@@ -454,3 +577,21 @@ if __name__ == "__main__":
 
     # cut_segment_model_input_and_output(save_path,date)
 
+    dates = ["27_07_21","14_09_21","25_05_22","15_07_22","14_09_22"]
+
+    # for date in dates:
+    #     save_path = f"F:\Hyperspecial\pear_processed\{date}"
+    #     cut_segment_model_input_and_output(save_path,date)
+
+    # for date in dates:
+    #     # save_path = f"F:\Hyperspecial\pear_processed\{date}"
+    #     # save_path = f"F:\\Hyperspecial\\pear\\{date}\\Aerial_UAV_Photos"
+    #     save_path = f"F:\\Hyperspecial\\pear_processed\\{date}"
+    #     # cut_image_for_object_detection_model(save_path,date)
+
+    #     generate_segment_annotation(save_path)
+
+    # split_train_val_for_object_detection()
+    # convert_np_to_tif()
+
+    present_segmentation("","")

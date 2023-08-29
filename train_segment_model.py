@@ -94,7 +94,7 @@ if __name__ == "__main__":
     epoch_num = 50
     batch_size = 8
     learn_rate = 0.0001
-    pretrained_model_path = "log\\segment_best_pretrained.pth"
+    pretrained_model_path = "log\\segment_best.pth"
 
     model = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True)
     print(model)
